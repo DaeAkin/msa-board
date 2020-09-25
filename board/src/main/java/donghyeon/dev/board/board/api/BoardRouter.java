@@ -8,6 +8,7 @@ import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
 import static org.springframework.http.HttpMethod.GET;
+import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.web.reactive.function.server.RequestPredicates.*;
 import static org.springframework.web.reactive.function.server.RouterFunctions.nest;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
@@ -17,8 +18,12 @@ import static org.springframework.web.reactive.function.server.RouterFunctions.r
 public class BoardRouter {
     @Bean
     public RouterFunction<ServerResponse> routerFunction(BoardHandler boardHandler) {
+
         return nest(path("/board"),
-                route(method(GET),boardHandler::getAllBoard))
-                .andRoute(GET("/{id}"),boardHandler::getOneBoard);
+                route(GET("/"),boardHandler::getAllBoard))
+                .andRoute(GET("/{id}"),boardHandler::getOneBoard)
+                .andRoute(POST("/"),boardHandler::createBoard)
+                .andRoute(PATCH("/"),boardHandler::updateBoard)
+                .andRoute(DELETE("/"),boardHandler::deleteBoard);
     }
 }

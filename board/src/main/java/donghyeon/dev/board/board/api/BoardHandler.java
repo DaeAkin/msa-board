@@ -1,6 +1,7 @@
 package donghyeon.dev.board.board.api;
 
 import donghyeon.dev.board.board.domain.Board;
+import donghyeon.dev.board.board.dto.BoardSaveRequest;
 import donghyeon.dev.board.board.repository.BoardRepository;
 import lombok.RequiredArgsConstructor;
 import org.springframework.http.MediaType;
@@ -29,14 +30,16 @@ public class BoardHandler {
     }
 
     public Mono<ServerResponse> createBoard(ServerRequest request) {
-        Mono<Board> board = request.bodyToMono(Board.class);
+        Mono<BoardSaveRequest> boardSave = request.bodyToMono(BoardSaveRequest.class);
+        Mono<Board> board = boardSave.map(BoardSaveRequest::toEntity);
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_STREAM_JSON)
                 .body(boardRepository.save(board), Board.class);
     }
 
     public Mono<ServerResponse> updateBoard(ServerRequest request) {
-        Mono<Board> board = request.bodyToMono(Board.class);
+        Mono<BoardSaveRequest> boardSave = request.bodyToMono(BoardSaveRequest.class);
+        Mono<Board> board = boardSave.map(BoardSaveRequest::toEntity);
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_STREAM_JSON)
                 .body(boardRepository.save(board), Board.class);
