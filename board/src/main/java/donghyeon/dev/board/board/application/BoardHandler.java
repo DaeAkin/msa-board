@@ -1,4 +1,4 @@
-package donghyeon.dev.board.board.api;
+package donghyeon.dev.board.board.application;
 
 import donghyeon.dev.board.board.domain.Board;
 import donghyeon.dev.board.board.dto.BoardSaveRequest;
@@ -17,7 +17,7 @@ public class BoardHandler {
     private final BoardRepository boardRepository;
 
     public Mono<ServerResponse> getOneBoard(ServerRequest request) {
-        Long id = Long.parseLong(request.pathVariable("id"));
+        String id = request.pathVariable("id");
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_JSON)
                 .body(boardRepository.findById(id), Board.class);
@@ -30,23 +30,23 @@ public class BoardHandler {
     }
 
     public Mono<ServerResponse> createBoard(ServerRequest request) {
-        Mono<BoardSaveRequest> boardSave = request.bodyToMono(BoardSaveRequest.class);
-        Mono<Board> board = boardSave.map(BoardSaveRequest::toEntity);
+        Mono<BoardSaveRequest> boardSaveRequest = request.bodyToMono(BoardSaveRequest.class);
+        Mono<Board> boardSave = boardSaveRequest.flatMap(board -> boardRepository.save(board.toEntity()));
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_STREAM_JSON)
-                .body(boardRepository.save(board), Board.class);
+                .body(boardSave, Board.class);
     }
 
     public Mono<ServerResponse> updateBoard(ServerRequest request) {
-        Mono<BoardSaveRequest> boardSave = request.bodyToMono(BoardSaveRequest.class);
-        Mono<Board> board = boardSave.map(BoardSaveRequest::toEntity);
+        Mono<BoardSaveRequest> boardSaveRequest = request.bodyToMono(BoardSaveRequest.class);
+        Mono<Board> boardUpdate = boardSaveRequest.flatMap(board -> boardRepository.save(board.toEntity()));
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_STREAM_JSON)
-                .body(boardRepository.save(board), Board.class);
+                .body(boardUpdate, Board.class);
     }
 
     public Mono<ServerResponse> deleteBoard(ServerRequest request) {
-        Long id = Long.parseLong(request.pathVariable("id"));
+        String id = request.pathVariable("id");
         return ServerResponse.ok()
                 .contentType(MediaType.APPLICATION_STREAM_JSON)
                 .body(boardRepository.deleteById(id), Board.class);
