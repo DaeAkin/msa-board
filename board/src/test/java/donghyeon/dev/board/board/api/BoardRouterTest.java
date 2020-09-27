@@ -47,7 +47,7 @@ public class BoardRouterTest {
     public void board_getAll_Test() {
         Board board1 = new Board("boardTitle1",1L,"boardContent2");
         Board board2 = new Board("boardTitle2",1L,"boardContent2");
-        BoardGenerator.createBoard(boardRepository,Flux.just(board1,board2).
+        BoardGenerator.createBoard(boardRepository,Flux.just(board1,board2).blockLast());
 
         webClient.get()
                 .uri(BOARD_API_URL)
@@ -71,7 +71,27 @@ public class BoardRouterTest {
 
     @Test
     public void board_update_Test() {
+        Board board = new Board("boardTitle1",1L,"boardContent2");
+        Board boardEntity = BoardGenerator.createBoard(boardRepository, board).block();
 
+        BoardSaveRequest boardSaveRequest = new BoardSaveRequest("title","content");
+
+        webClient.patch()
+                .uri(BOARD_API_URL+"/"+boardEntity.getObjectId())
+                .body(Mono.just(boardSaveRequest),BoardSaveRequest.class)
+                .exchange()
+                .expectStatus().isOk();
+    }
+
+    @Test
+    public void board_delete_Test() {
+        Board board = new Board("boardTitle1",1L,"boardContent2");
+        Board boardEntity = BoardGenerator.createBoard(boardRepository, board).block();
+
+        webClient.patch()
+                .uri(BOARD_API_URL+"/"+boardEntity.getObjectId())
+                .exchange()
+                .expectStatus().isOk();
     }
 
 
