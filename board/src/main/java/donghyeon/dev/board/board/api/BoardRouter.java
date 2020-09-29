@@ -21,7 +21,7 @@ public class BoardRouter {
                 route(GET("/"),boardHandler::getAllBoard)
                 .andRoute(GET("/{id}"),boardHandler::getOneBoard)
                 .andRoute(POST("/"),boardHandler::createBoard)
-                .andRoute(PATCH("/"),boardHandler::updateBoard)
-                .andRoute(DELETE("/"),boardHandler::deleteBoard));
+                .andRoute(PATCH("/{id}"),boardHandler::updateBoard)
+                .andRoute(DELETE("/{id}"),boardHandler::deleteBoard));
     }
 }

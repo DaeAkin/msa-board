@@ -37,13 +37,16 @@ public class BoardHandler {
                 .body(boardSave, Board.class);
     }
 
-    public Mono<ServerResponse> updateBoard(ServerRequest request) {
-        Mono<BoardSaveRequest> boardSaveRequest = request.bodyToMono(BoardSaveRequest.class);
-        Mono<Board> boardUpdate = boardSaveRequest.flatMap(board -> boardRepository.save(board.toEntity()));
-        return ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_STREAM_JSON)
-                .body(boardUpdate, Board.class);
-    }
+//    public Mono<ServerResponse> updateBoard(ServerRequest request) {
+//        String id = request.pathVariable("id");
+//        boardRepository.findById(id)
+//                .
+//        Mono<BoardSaveRequest> boardSaveRequest = request.bodyToMono(BoardSaveRequest.class);
+//        Mono<Board> boardUpdate = boardSaveRequest.flatMap(board -> boardRepository.save(board.toEntity()));
+//        return ServerResponse.ok()
+//                .contentType(MediaType.APPLICATION_STREAM_JSON)
+//                .body(boardUpdate, Board.class);
+//    }
 
     public Mono<ServerResponse> deleteBoard(ServerRequest request) {
         String id = request.pathVariable("id");
