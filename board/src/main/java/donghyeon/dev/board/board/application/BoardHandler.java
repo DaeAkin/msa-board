@@ -10,6 +10,11 @@ import org.springframework.web.reactive.function.server.ServerRequest;
 import org.springframework.web.reactive.function.server.ServerResponse;
 import reactor.core.publisher.Mono;
 
+import java.util.ArrayList;
+import java.util.List;
+
+import static org.springframework.web.reactive.function.BodyInserters.fromPublisher;
+
 @Component
 @RequiredArgsConstructor
 public class BoardHandler {
@@ -25,7 +30,7 @@ public class BoardHandler {
 
     public Mono<ServerResponse> getAllBoard(ServerRequest request) {
         return ServerResponse.ok()
-                .contentType(MediaType.APPLICATION_STREAM_JSON)
+                .contentType(MediaType.APPLICATION_JSON)
                 .body(boardRepository.findAll(), Board.class);
     }
 
@@ -54,10 +59,6 @@ public class BoardHandler {
                 .contentType(MediaType.APPLICATION_STREAM_JSON)
                 .body(boardRepository.deleteById(id), Board.class);
     }
-
-
-
-
 
 
 }
