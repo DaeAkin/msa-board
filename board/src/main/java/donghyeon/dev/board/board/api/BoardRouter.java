@@ -1,14 +1,12 @@
 package donghyeon.dev.board.board.api;
 
+import donghyeon.dev.board.board.application.BoardHandler;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.web.reactive.config.EnableWebFlux;
 import org.springframework.web.reactive.function.server.RouterFunction;
-import org.springframework.web.reactive.function.server.RouterFunctions;
 import org.springframework.web.reactive.function.server.ServerResponse;
 
-import static org.springframework.http.HttpMethod.GET;
-import static org.springframework.http.HttpMethod.POST;
 import static org.springframework.web.reactive.function.server.RequestPredicates.*;
 import static org.springframework.web.reactive.function.server.RouterFunctions.nest;
 import static org.springframework.web.reactive.function.server.RouterFunctions.route;
@@ -20,10 +18,10 @@ public class BoardRouter {
     public RouterFunction<ServerResponse> routerFunction(BoardHandler boardHandler) {
 
         return nest(path("/board"),
-                route(GET("/"),boardHandler::getAllBoard))
+                route(GET("/"),boardHandler::getAllBoard)
                 .andRoute(GET("/{id}"),boardHandler::getOneBoard)
                 .andRoute(POST("/"),boardHandler::createBoard)
-                .andRoute(PATCH("/"),boardHandler::updateBoard)
-                .andRoute(DELETE("/"),boardHandler::deleteBoard);
+//                .andRoute(PATCH("/{id}"),boardHandler::updateBoard)
+                .andRoute(DELETE("/{id}"),boardHandler::deleteBoard));
     }
 }

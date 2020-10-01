@@ -1,6 +1,8 @@
 spring:
-  datasource:
-    driver-class-name: org.h2.Driver
-    url: r2dbc:h2:mem:localhost;DB_CLOSE_ON_EXIT=FALSE
-    username: admin
-    password:
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+
+
+
