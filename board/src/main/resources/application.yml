@@ -1,8 +1,37 @@
 spring:
+  profiles:
+    active: dev
+---
+spring:
+  profiles: dev
   jpa:
     hibernate:
       ddl-auto: create-drop
     show-sql: true
+  data:
+    mongodb:
+      host: localhost
+      port: 27017
+      database: admin
+      username: admin
+      password: admin
+
+
+---
+spring:
+  profiles: docker
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+    show-sql: true
+  data:
+    mongodb:
+      host: mongodb-test
+      port: 27017
+      database: admin
+      username: admin
+      password: admin
+
 
 
 
