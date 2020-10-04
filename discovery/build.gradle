@@ -25,13 +25,13 @@ dependencyManagement {
 }
 
 dependencies {
-    implementation('org.springframework.boot:spring-boot-starter-data-mongodb-reactive')// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-data-mongodb
-    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb', version: '2.3.3.RELEASE'
+//    implementation('org.springframework.boot:spring-boot-starter-data-mongodb-reactive')// https://mvnrepository.com/artifact/org.springframework.boot/spring-boot-starter-data-mongodb
+//    implementation group: 'org.springframework.boot', name: 'spring-boot-starter-data-mongodb', version: '2.3.3.RELEASE'
 
 
 //    testCompile group: "de.flapdoodle.embed", name: "de.flapdoodle.embed.mongo", version: "2.2.1-SNAPSHOT"
 //    implementation 'org.springframework.boot:spring-boot-starter-data-r2dbc'
-    implementation group: 'javax.persistence', name: 'persistence-api', version: '1.0'
+//    implementation group: 'javax.persistence', name: 'persistence-api', version: '1.0'
     implementation 'org.springframework.boot:spring-boot-starter-webflux'
     compileOnly 'org.projectlombok:lombok'
     annotationProcessor 'org.projectlombok:lombok'
@@ -39,9 +39,9 @@ dependencies {
         exclude group: 'org.junit.vintage', module: 'junit-vintage-engine'
     }
     testImplementation 'io.projectreactor:reactor-test'
-    runtimeOnly 'io.r2dbc:r2dbc-h2'
+//    runtimeOnly 'io.r2dbc:r2dbc-h2'
 
-    implementation('org.springframework.cloud:spring-cloud-starter-netflix-eureka-client')
+    implementation('org.springframework.cloud:spring-cloud-starter-netflix-eureka-server')
 }
 
 test {
