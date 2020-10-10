@@ -473,6 +473,108 @@ public class MyClass {
 
 ### 리본 설정 캐시하기
 
+각각의 리본 네임드 클라이언트는 스프링 클라우트가 관리하는 자식 application Context와 일치합니다. 이 application context는 처음 네임드 클라이언트에게 요청을 할 때, 지연 로딩 됩니다. 지연 로딩 동작은 리본 클라이언트의 이름을 설정해줌으로써  즉시로딩으로 변경할 수 있습니다.
+
+**application.yml**
+
+```yaml
+ribbon:
+  eager-load:
+    enabled: true
+    clients: client1, client2, client3
+```
+
+
+
+### 히스트릭스 스레드 풀 설정하기
+
+`zuul.riboonIsolationStrategy` 의 값을 `THREAD` 로 설정했다면, 히스트릭스는 모든 라우터에 대해 스레드 격리 전략을 사용합니다 이 경우 `HystrixTreadPoolKey` 값이 `RibbonCommand` 로 기본값 설정 됩니다. 이 말은 모든 라우트에 관한 HystrixCommand가 같은 Hystrix 스레드 풀에서 실행된다는 뜻입니다. 이 동작은 다음과 같은 설정으로 변경할 수 있습니다. 
+
+**application.yml**
+
+```yaml
+zuul:
+  threadPool:
+    useSeparateThreadPools: true
+```
+
+방금 예제의 결과는 HystrixCommand가 각 라우트 마다 스레드 풀에서 실행 됩니다.
+
+이 경우 , 기본 `HystrixThreadPoolKey` 값은 각 라우트의 서비스 ID와 같습니다. prefix를 추가하고 싶으면 `zuul.threadPool.threadPoolkeyPrefix` 를 설정파일에 추가하면 됩니다. 
+
+**application.yml**
+
+```yaml
+zuul:
+  threadPool:
+    useSeparateThreadPools: true
+    threadPoolKeyPrefix: zuulgw
+```
+
+
+
+### 리본의 IRule에 키를 제공하는 방법
+
+### [7.11. How to Provide a Key to Ribbon’s `IRule`](https://docs.spring.io/spring-cloud-netflix/docs/2.2.5.RELEASE/reference/html/#how-to-provdie-a-key-to-ribbon)
+
+If you need to provide your own `IRule` implementation to handle a special routing requirement like a “canary” test, pass some information to the `choose` method of `IRule`.
+
+com.netflix.loadbalancer.IRule.java
+
+```
+public interface IRule{
+    public Server choose(Object key);
+         :
+```
+
+You can provide some information that is used by your `IRule` implementation to choose a target server, as shown in the following example:
+
+```
+RequestContext.getCurrentContext()
+              .set(FilterConstants.LOAD_BALANCER_KEY, "canary-test");
+```
+
+If you put any object into the `RequestContext` with a key of `FilterConstants.LOAD_BALANCER_KEY`, it is passed to the `choose` method of the `IRule` implementation. The code shown in the preceding example must be executed before `RibbonRoutingFilter` is executed. Zuul’s pre filter is the best place to do that. You can access HTTP headers and query parameters through the `RequestContext` in pre filter, so it can be used to determine the `LOAD_BALANCER_KEY` that is passed to Ribbon. If you do not put any value with `LOAD_BALANCER_KEY` in `RequestContext`, null is passed as a parameter of the `choose` method.
+
+
+
+## [ 8. External Configuration: Archaius](https://docs.spring.io/spring-cloud-netflix/docs/2.2.5.RELEASE/reference/html/#external-configuration-archaius)
+
+[Archaius](https://github.com/Netflix/archaius) is the Netflix client-side configuration library. It is the library used by all of the Netflix OSS components for configuration. Archaius is an extension of the [Apache Commons Configuration](https://commons.apache.org/proper/commons-configuration) project. It allows updates to configuration by either polling a source for changes or by letting a source push changes to the client. Archaius uses Dynamic<Type>Property classes as handles to properties, as shown in the following example:
+
+Archaius Example
+
+```java
+class ArchaiusTest {
+    DynamicStringProperty myprop = DynamicPropertyFactory
+            .getInstance()
+            .getStringProperty("my.prop");
+
+    void doSomething() {
+        OtherClass.someMethod(myprop.get());
+    }
+}
+```
+
+Archaius has its own set of configuration files and loading priorities. Spring applications should generally not use Archaius directly, but the need to configure the Netflix tools natively remains. Spring Cloud has a Spring Environment Bridge so that Archaius can read properties from the Spring Environment. This bridge allows Spring Boot projects to use the normal configuration toolchain while letting them configure the Netflix tools as documented (for the most part).
+
+## 라우터와 필터 : Zuul
+
+마이크로서비스 아키텍처에서 필수 입니다. 예를 들어 `/` 경로는 웹 애플리케이션으로 매핑되고, /api/users는 user 서비스로 맵핑하고, /api/shop은 shop 서비스로 매핑할 수 있습니다. Zuul은 JVM기반 라우터이며, 서버 사이드 로드 밸런서 입니다.
+
+넷플릭스에서는 다음과 같이 Zuul을 사용합니다.
+
+- Authentication
+- Insights
+- Stress Testing
+- Canary Testing
+- Dynamic Routing
+- Service Migration
+- Load Shedding
+- Security
+- Static Response handling
+- Active/Active traffic management
+
 
 
 ## 참고자료
