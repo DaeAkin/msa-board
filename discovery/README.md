@@ -575,6 +575,160 @@ Archaius has its own set of configuration files and loading priorities. Spring a
 - Static Response handling
 - Active/Active traffic management
 
+Zuul’s rule engine lets rules and filters be written in essentially any JVM language, with built-in support for Java and Groovy.
+
+> The configuration property `zuul.max.host.connections` has been replaced by two new properties, `zuul.host.maxTotalConnections` and `zuul.host.maxPerRouteConnections`, which default to 200 and 20 respectively.
+
+>  The default Hystrix isolation pattern (`ExecutionIsolationStrategy`) for all routes is `SEMAPHORE`. `zuul.ribbonIsolationStrategy` can be changed to `THREAD` if that isolation pattern is preferred.
+
+### Zuul 포함하기
+
+프로젝트에 zuul을 포함하고 싶다면, `org.springframework.cloud:spring-cloud-starter-netflix-zuul` 을 추가하면 됩니다.
+
+
+
+### Zuul 리버스 프록시 내장
+
+스프링 클라우드는 UI 애플리케이션(프론트엔드 ex) React, Vue) 이 하나 이상의 백엔드 서비스에 대해 프록시 호출을 원하는 일반적인 사례에서, 개발을 쉽게하기 위해 임베디드 Zuul 프록시를 만들었습니다. 이런 기능은 사용자 인터페이스가 필요한 백엔드 서비스를 프록시하는데 유용하므로 모든 백엔드에 대해 CORS 및 인증 문제를 독립적으로 관리 할 필요가 없습니다.
+
+활성화 하기 위해, @EnableZuulProxyt 어노테이션을 스프링 부트 메인 클래스에 붙여주면 됩니다. 이렇게 함으로써 요청들이 적절한 서비스로 포워드 됩니다. 컨벤션에 따라, 사용자 ID가 있는 서비스는 /users에 있는 프록시에서 요청을 수신합니다. 프록시는 리본을 사용하여 디스커버리를 통해 인스턴스가 어디에 있는지 확인합니다. 모든 요청은 hystrix command 안에서 실행되며, 요청 실패시 Hystrix metrics에 보여지게 됩니다. 서킷 브레이커가 발동되면 프록시는 서비스와 교류하지 않습니다.
+
+> Zull starter 라이브러리는 discovery client를 포함하지 않습니다. 서비스 ID를 기반으로 라우트를 하고 싶다면 유레카 클라이언트 라이브러리를 추가하는 것이 좋습니다.
+
+서비스가 자동으로 추가되는 것을 건너뛰고 싶다면, `zuul.ignored-services` 에 서비스 ID 패턴의 목록을 추가하면 됩니다. 이 값의 패턴과 일치하면 해당 서비스를 무시하고, 명시적으로 routes에 적어준 값들은 포함됩니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  ignoredServices: '*'
+  routes:
+    users: /myusers/**
+```
+
+users 서비스는 빼고 다른 서비스는 모두 무시 됩니다. 
+
+프록시 경로를 늘리거나 변경하려면 다음과 같이 외부 구성을 추가 할 수 있습니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  routes:
+    users: /myusers/**
+```
+
+위에 설정은, `/mysuers` 요청들을 users 서비스도 포워딩 됩니다.ex) `/myusers/101` 은 `/101` 로 포워딩 됩니다.
+
+또한 독립적으로 서비스Id와 url을 맵핑 시켜줄수 있습니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  routes:
+    users:
+      path: /myusers/**
+      serviceId: users_service
+```
+
+위에 예제는 `/myusers` 로 들어오는 요청은 `users_service` 서비스로 포워딩 됩니다. 라우트는 안티스타일 패턴으로 `path` 를 반드시 지정해줘야 하며,  `/myusers/*` 은 오직 1레벨 까지만 일치하는지 검사하고, `/myusers/**` 은 모든 계층을 검사합니다.
+
+백엔드의 위치는 다음과 같이  `serviceId` 나 `url`로 지정해 줄 수 있습니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  routes:
+    users:
+      path: /myusers/**
+      url: https://example.com/users_service
+```
+
+위에 예제는 HystrixCommand로 실행하지도 않으며, 리본을 이용한 로드밸런싱도 되지 않습니다. 이런 기능들을 사용하고 싶으면 다음과 같이 사용해야 합니다. 
+
+**application.yml**
+
+```yaml
+zuul:
+  routes:
+    echo:
+      path: /myusers/**
+      serviceId: myusers-service
+      stripPrefix: true
+
+hystrix:
+  command:
+    myusers-service:
+      execution:
+        isolation:
+          thread:
+            timeoutInMilliseconds: ...
+
+myusers-service:
+  ribbon:
+    NIWSServerListClassName: com.netflix.loadbalancer.ConfigurationBasedServerList
+    listOfServers: https://example1.com,http://example2.com
+    ConnectTimeout: 1000
+    ReadTimeout: 3000
+    MaxTotalHttpConnections: 500
+    MaxConnectionsPerHost: 100
+```
+
+다른 방법으로는 다음과 같이 serviceId에 대한 서비스라우트와 리본클라이언트 설정을 해주는 것입니다.(이렇게 할땐, 유레카에서 리본을 사용하지 않아야함)
+
+**application.yml**
+
+```yaml
+zuul:
+  routes:
+    users:
+      path: /myusers/**
+      serviceId: users
+
+ribbon:
+  eureka:
+    enabled: false
+
+users:
+  ribbon:
+    listOfServers: example.com,google.com
+```
+
+`regexmapper` serviceId와 라우트 간의 컨벤션을 제공해줄 수 있습니다.It uses regular-expression named groups to extract variables from `serviceId` and inject them into a route pattern, as shown in the following example:
+
+**ApplicationConfiguration.java**
+
+```java
+@Bean
+public PatternServiceRouteMapper serviceRouteMapper() {
+    return new PatternServiceRouteMapper(
+        "(?<name>^.+)-(?<version>v.+$)",
+        "${version}/${name}");
+}
+```
+
+위에 예제는 myusers-v1의 serviceId를 `/v1/myusers/**` 로 맵핑하라는 예제 입니다. 모든 정규식이 허용되지만, 모든 네임드 그룹은 servicePattern과 routePattern에 모두 있어야합니다.(?) `servicePattern`이 `serviceId` 와 맞지 않으면, 기본 동작으로 대체됩니다. 이전 예제에서 myusers의 serviceId를 /myusers/**(version은 없음) 라우트로 맵핑 했습니다.  이 기능은 기본적으로 비활성화 되어 있으며, 오직 디스커버리안에 있는 서비스에만 적용이 가능합니다. 
+
+만약 prefix를 `/api` 같은걸 모든 맵핑에 지정하고 싶으면 `zuul.prefix` 값을 설정하면 됩니다. 프록시 prefix는 request가 포워딩 될때 제거됩니다.(zuul.stripPrefix = false로 끌 수 있음.) 또한 개별로 서비스 별 prefix 제거를 끌 수 있습니다.
+
+```yaml
+ zuul:
+  routes:
+    users:
+      path: /myusers/**
+      stripPrefix: false
+```
+
+> `zuul.stripPrefix` 는 `zuul.prefix` 에 설정된 prefix에만 적용됩니다. 지정된 라우트 경로 내에 정의된 prefix에는 영향을 주지 않습니다.
+
+
+
+앞선 예제는 `/myusers/101` 로 들어오는 요청은 users 서비스의 `/myusers/101` 로포워딩 됩니다.
+
+`zuul.rotes` 들의 값들은 실제로 ZuulProperties
+
 
 
 ## 참고자료
