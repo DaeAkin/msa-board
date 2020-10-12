@@ -727,7 +727,17 @@ public PatternServiceRouteMapper serviceRouteMapper() {
 
 앞선 예제는 `/myusers/101` 로 들어오는 요청은 users 서비스의 `/myusers/101` 로포워딩 됩니다.
 
-`zuul.rotes` 들의 값들은 실제로 ZuulProperties
+`zuul.rotes` 들의 값들은 실제로 ZuulProperties 객체에 바인딩 됩니다. 이 객체를 들여다보면, `retryable` 이라는 flag를 갖고 있습니다. 이 flag를 `ture`로 설정하면, 요청 실패 시 리본 클라이언트가 자동적으로 재시도 합니다. You can also set that flag to true when you need to modify the parameters of the retry operations that use the Ribbon client configuration.
+
+기본적으로 `X-Forwarded-Host` 헤더는 포워딩 될 요청에 추가됩니다. 끄고 싶다면, `zuul.addProxyHeaders = false`ㄹ로 설정하면 됩니다.   ㄴ
+
+
+
+
+
+
+
+## 참고자료
 
 
 
