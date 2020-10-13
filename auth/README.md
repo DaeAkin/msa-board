@@ -531,5 +531,247 @@ security:
       userInfoUri: https://idp.example.com/oauth2/userinfo
 ```
 
+리소스 서버는 Bearer 토큰을 전송하고 결과로 Authentication 객체를 받습니다.
+
+#### 유저 정보 요청 커스터마이징 하기
+
+내부적으로 리소스 서버는 `/userinfo` 를 호출하기 위해 `Oauth2RestTemplate` 을 사용합니다. 그 때 호출을 하기 위해 필터를 추가하거나 다른 로직을 수행이 필요할 수 있습니다. 커스터마이징을 하려면 다음과 같이 `UserInfoRestTemplateCustomizer` bean을 만들면 됩니다.
+
+```java
+@Bean
+public UserInfoRestTemplateCustomizer customHeader() {
+	return restTemplate ->
+			restTemplate.getInterceptors().add(new MyCustomInterceptor());
+}
+```
+
+이 bean은 `UserInfoTemplateFactory` 클래스에 넘겨지며 `/userinfo` 엔드포인트에 대해 설정을 합니다.
+
+### 권한 역할 커스터마이징
+
+Spring Seucirty와 비슷하게, 엔드포인트에대한 권한 역할을 커스터마이징 할 수 있습니다.
+
+```java
+public class HasAuthorityConfig
+		extends ResourceServerConfigurerAdapter {
+
+	@Override
+	public void configure(HttpSecurity http) throws Exception {
+		// @formatter:off
+		http
+			.authorizeRequests()
+				.antMatchers("/flights/**").hasAuthority("#oauth2.hasScope('message:read')")
+				.anyRequest().authenticated();
+		// @formatter:on
+	}
+```
+
+Though, note that if a server is configured both as a resource server and as an authorization server, then there are certain endpoint that require special handling. To avoid configuring over the top of those endpoints (like `/token`), it would be better to isolate your resource server endpoints to a targeted directory like so:
+
+```java
+public class ResourceServerEndpointConfig
+		extends ResourceServerConfigurerAdapter {
+
+	@Override
+	public void configure(HttpSecurity http) throws Exception {
+		// @formatter:off
+		http
+			.antMatchers("/resourceA/**", "/resourceB/**")
+			.authorizeRequests()
+				.antMatchers("/resourceA/**").hasAuthority("#oauth2.hasScope('resourceA:read')")
+				.antMatchers("/resourceB/**").hasAuthority("#oauth2.hasScope('resourceB:read')")
+				.anyRequest().authenticated();
+		// @formatter:on
+	}
+```
+
+As the above configuration will target your resource endpoints and not affect authorization server-specific endpoints.
 
 
+
+### 덜 쓰는 기능 들
+
+#### Token 타입 변경하기
+
+구글과 다른 서드파티 업체들은 사용자 정보 엔드포인트로 전송되는 토큰의 이름을 엄격하게 다룹니다. 기본적으로는 `Bearer` 이름이 붙지만, `security.oauth2.resource.token-type` 설정으로 변경이 가능합니다
+
+#### Filter 순서 변경하기
+
+OAuth2는 `security.oauth2.resource.filter-order` 에 명시된 필터 체인 순서대로 리소스를 보호합니다. 
+
+기본으로 필터는 `AuthorizationServerConfigurereAdapter` 가 제일 먼저오고, 그 다음 `ResourceServerConfigurerAdapter` 그 다음 `WebSecurityConfigurerAdapter` 가 옵니다.
+
+이 말은 모든 애플리케이션 엔드포인트가 다음의 두가지를 만족하지 않으면 bearer 토큰 인증이 필요하다는 뜻 입니다.
+
+1. 필터 순서가 바뀌거나 
+2. The `ResourceServerConfigurerAdapter` set of authorized requests is narrowed
+
+첫번 째는 필터 순서를 바꾸는 건데, WebSecurityConfigurerAdapter를 ResourceServerConfigurerAdapter 앞에 다음과 같이 이동하여 수행 할 수 있습니다.
+
+```java
+@Order(2)
+@EnableWebSecurity
+public WebSecurityConfig extends WebSecurityConfigurerAdapter {
+	// ...
+}
+```
+
+|      | Resource Server’s default `@Order` value is 3 which is why the example sets Web’s `@Order` to 2, so that it’s evaluated earlier. |
+| ---- | ------------------------------------------------------------ |
+|      |                                                              |
+
+While this may work, it’s a little odd since we may simply trade one problem:
+
+> `ResourceServerConfigurerAdapter` is handling requests it shouldn’t
+
+For another:
+
+> `WebSecurityConfigurerAdapter` is handling requests it shouldn’t
+
+The more robust solution, then, is to indicate to `ResourceServerConfigurerAdapter` which endpoints should be secured by bearer token authentication.
+
+For example, the following configures Resource Server to secure the web application endpoints that begin with `/rest`:
+
+```java
+@EnableResourceServer
+public ResourceServerConfig extends ResourceServerConfigurerAdapter {
+	@Override
+    protected void configure(HttpSecurity http) {
+        http
+            .requestMatchers()
+                .antMatchers("/rest/**")
+            .authorizeRequests()
+                .anyRequest().authenticated();
+    }
+}
+```
+
+
+
+#### /error 엔드포인트 허가하기
+
+리소스 서버는 인증 프로세스 로직을 탈 때 `Oauth2ClientContext` <u>request-scoped</u> 빈에 의존 합니다. 그리고 에러 상황이 발생하면, 리소스 서버는 ERROR 서블릿 디스패처로 포워드 합니다.
+
+기본적으로 <u>request-scoped</u> 빈은 ERROR 디스패치가 사용하지 못합니다. 그러므로 `Oauth2ClientContext` bean not being available. 이라는 메세지를 보게 됩니다.
+
+가장 간단한 방법은 `/error` 엔드포인트를 허가해주어 리소스 서버가 인증을 시도하거나 요청을 하지 않게 하는 방법입니다.
+
+```java
+public class PermitErrorConfig extends ResourceServerConfigurerAdapter {
+    @Override
+	public void configure(HttpSecurity http) throws Exception {
+		// @formatter:off
+		http
+			.authorizeRequests()
+				.antMatchers("/error").permitAll()
+				.anyRequest().authenticated();
+		// @formatter:on
+	}
+}
+```
+
+Other solutions are to configure Spring so that the `RequestContextFilter` is registered with the error dispatch or to register a `RequestContextListener` bean.
+
+
+
+## 클라이언트
+
+웹 애플리케이션을 OAuth2 클라이언트로 만들고 싶으면, @EnableOAuth2Client 어노테이션을 추가하고, `OAuth2RestOperations` 의 필수 클래스인 `OAuth2ClientContext` 와 `OAuth2ProtectedResourceDetails` 를 만들어야 합니다. 스프링 부트는 이 두개의 클래스를 자동으로 빈으로 만들어 주지 않기 때문에, 다음과 같이 만들어야 합니다.
+
+```java
+@Bean
+public OAuth2RestTemplate oauth2RestTemplate(OAuth2ClientContext oauth2ClientContext,
+        OAuth2ProtectedResourceDetails details) {
+    return new OAuth2RestTemplate(details, oauth2ClientContext);
+}
+```
+
+>  You may want to add a qualifier and review your configuration, as more than one `RestTemplate` may be defined in your application.
+
+아래의 설정은 `security.oauth2.client.*` 의 값을 인증정보로 사용합니다. 그러나 추가적으로 인증서버의 토큰 url을 알아야 할 수도 있습니다. 
+
+**application.yml**
+
+```yaml
+security:
+  oauth2:
+    client:
+      clientId: bd1c0a783ccdd1c9b9e4
+      clientSecret: 1a9030fbca47a5b2c28e92f19050bb77824b5ad1
+      accessTokenUri: https://github.com/login/oauth/access_token
+      userAuthorizationUri: https://github.com/login/oauth/authorize
+      clientAuthenticationScheme: form
+```
+
+이 설정은 `OAuth2RestTemplate` 을 사용할 때 깃헙에 인증을 받기위해 리다이렉트 합니다. 
+
+클라이언트가 액세스 토큰을 얻기 위한 요청의 범위를 제한하려면 `security.oauth2.client.scope` 로 설정할 수 있습니다. 기본적으로 범위 값은 비어 있지만, 인증서버가 기본 값을 설정하기 나름 입니다.(usually depending on the settings in the client registration that it holds).
+
+>  There is also a setting for `security.oauth2.client.client-authentication-scheme`, which defaults to `header` (but you might need to set it to `form` if, like Github for instance, your OAuth2 provider does not like header authentication). In fact, the `security.oauth2.client.*` properties are bound to an instance of `AuthorizationCodeResourceDetails`, so all of its properties can be specified.
+
+>  In a non-web application, you can still create an `OAuth2RestOperations`, and it is still wired into the `security.oauth2.client.*` configuration. In this case, you are asking for is a “client credentials token grant” if you use it (and there is no need to use `@EnableOAuth2Client` or `@EnableOAuth2Sso`). To prevent that infrastructure being defined, remove the `security.oauth2.client.client-id` from your configuration (or make it be an empty string).
+
+
+
+## Single Sign on
+
+OAuth2 클라이언트를 사용하여 프로바이더에서 사용자 세부 정보를 가져온 다음 Spring Security 용 인증 토큰으로 변환 할 수 있습니다. 리소스 서버는 `user-info-uri` 속성을 통해 SSO를 지원합니다.  이것은 OAuth2를 기반한 SSO 프로토콜의 기초이며, 스프링 부트는 `@EnableOauth2Sso` 를 제공하여 쉽게 제공해줍니다. 방금 보여드린 깃헙 클라이언트는 모든 리소스가 보호되고 있으며 깃헙의 `/user/` 엔드포인트를 이용해 인증을 받습니다. (The Github client shown in the preceding section can protect all its resources and authenticate by using the Github `/user/` endpoint, by adding that annotation and declaring where to find the endpoint (in addition to the `security.oauth2.client.*` configuration already listed earlier):)
+
+**예제 1 : application.yml**
+
+```yaml
+security:
+  oauth2:
+# ...
+  resource:
+    userInfoUri: https://api.github.com/user
+    preferTokenInfo: false
+```
+
+기본적으로 모든 경로는 보호되고 있기 때문에, 인증받지 않은 유저에게 보여줄 home 페이지는 존재하지 않으며 로그인 하도록 초대해야 합니다(?)(`/login` 경로를 방문하거나, `security.oauth2.sso.login-path` 에 지정된 경로)
+
+보호할 접근 규칙이나 경로를 커스터마이징 하려면 
+
+
+
+To customize the access rules or paths to protect s(o you can add a “home” page for instance,) you can add `@EnableOAuth2Sso` to a `WebSecurityConfigurerAdapter`. The annotation causes it to be decorated and enhanced with the necessary pieces to get the `/login` path working. In the following example, we simply allow unauthenticated access to the home page at `/` and keep the default for everything else:
+
+```java
+@Configuration
+public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests()
+                .mvcMatchers("/").permitAll()
+                .anyRequest().authenticated();
+    }
+}
+```
+
+Also, note that, since all endpoints are secure by default, this includes any default error handling endpoints — for example, the `/error` endpoint. This means that, if there is some problem during Single Sign On that requires the application to redirect to the `/error` page, this can cause an infinite redirect between the identity provider and the receiving application.
+
+First, think carefully about making an endpoint insecure, as you may find that the behavior is simply evidence of a different problem. However, this behavior can be addressed by configuring the application to permit `/error`, as the following example shows:
+
+```java
+@Configuration
+public class WebSecurityConfiguration extends WebSecurityConfigurerAdapter {
+
+    @Override
+    protected void configure(HttpSecurity http) throws Exception {
+        http
+            .authorizeRequests()
+                .antMatchers("/error").permitAll()
+                .anyRequest().authenticated();
+    }
+}
+```
+
+
+
+
+
+## 참고자료
+
+https://docs.spring.io/spring-security-oauth2-boot/docs/current/reference/html5/#oauth2-boot-authorization-server-password-grant-authentication-configuration
