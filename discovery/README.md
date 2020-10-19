@@ -729,15 +729,85 @@ public PatternServiceRouteMapper serviceRouteMapper() {
 
 `zuul.rotes` 들의 값들은 실제로 ZuulProperties 객체에 바인딩 됩니다. 이 객체를 들여다보면, `retryable` 이라는 flag를 갖고 있습니다. 이 flag를 `ture`로 설정하면, 요청 실패 시 리본 클라이언트가 자동적으로 재시도 합니다. You can also set that flag to true when you need to modify the parameters of the retry operations that use the Ribbon client configuration.
 
-기본적으로 `X-Forwarded-Host` 헤더는 포워딩 될 요청에 추가됩니다. 끄고 싶다면, `zuul.addProxyHeaders = false`ㄹ로 설정하면 됩니다.   ㄴ
+기본적으로 `X-Forwarded-Host` 헤더는 포워딩 될 요청에 추가됩니다. 끄고 싶다면, `zuul.addProxyHeaders = false`로 설정하면 됩니다.   기본적으로 prefix는 벗겨지며 `X-Forwarded-Prefix` 헤더에 담깁니다.
+
+기본 라우트를 `/` 로 설정하면 `@EnableZuulProxy` 가 있는 애플리케이션은 독립적인 서버로 작동합니다. 예를 들어 `zuul.route.home : / ` 으로 설정하면 모든 트래픽이 "home" 서비스로 라우트 됩니다.
+
+좀 더 상세한 설정을 필요로 한다면, 특정 패턴을 무시하도록 명시해줄 수 있습니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  ignoredPatterns: /**/admin/**
+  routes:
+    users: /myusers/**
+```
+
+위에 예제는 `/myusers/101` 같은 요청을 `users` 서비스의 `/101` 로 보내지만, 중간에 `/admin/`  이 있다면 무시합니다.
+
+> 순서를 보장할 수 있게 작성하고 싶다면, properties 파일 대신 YAML 파일을 사용해야 합니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  routes:
+    users:
+      path: /myusers/**
+    legacy:
+      path: /**
+```
+
+If you were to use a properties file, the `legacy` path might end up in front of the `users` path, rendering the `users` path unreachable.
+
+### Zuul Http 클라이언트
+
+The default HTTP client used by Zuul is now backed by the Apache HTTP Client instead of the deprecated Ribbon `RestClient`. `RestClient` 나 `okhttp3.OkHttpClient` 를 사용하고 싶다면, `ribbon.restclient.enabled=true` 나 `ribbon.okhttp.enabled=true` 로 설정하면 됩니다. Apache HTTP client나 OK HTTP client를 커스터 마이징 하고 싶다면, `CloseableHttpClient` 나 `OkHttpClient` 빈을 제공하면 됩니다.
+
+### 쿠키와 민감한 헤더 정보
+
+같은 시스템 내에 있는 서비스들 끼리는 헤더를 공유할 수 있습니다. 그러나 외부 서버로 민감한 헤더 정보를 보내고 싶지 않을 때가 있습니다. 이를 설정하기 위해 라우트 설정에서 보내고 싶지 않는 헤더의 리스르를 작성할 수 있습니다. 쿠키는 브라우저에서 의미를 갖고 있고, 항상 민감한 것으로 취읍되기 때문에 특별합니다. 프록시의 소비자가 브라우저인 경우 다운 스트림 서비스에 대한 쿠키는 모두 함께 뒤죽박죽이 되기 때문에 사용자에게 문제를 일으킵니다. ( 모든 다운 스트림 서비스는 같은 곳에서 온 것처럼 보이기 때문에)
+
+서비스의 디자인에 주위를 기울였다면,(예를 들어 하나의 다운스트림 서비스에만 쿠키를 적용한 경우) 백엔드에서 호출자까지 서비스가 흐르도록 할 수 있습니다. 또한 프록시가 쿠키를 설정하고 모든 백엔드 서비스가 같은 시스템의 부분이라면, 자연스럽게 쿠키가 공유가 가능합니다.(예를 들어, Spring Session을 사용하여 쿠키를? 묶어 상태를 공유할 수 있습니다.) 또 다른점은, 다운스트림 서비스에서 가져오거나 설정하는 쿠키는 호출하는 사람에게 유용하지 않을 수 있습니다. 그러므로 Set-Cookie 및 Cookie를 도메인의 일부가 아닌 경로에 대해 민감한 헤더로 만드는 것을 추천합니다. 라우트가 도메인의 일부일지여도, 쿠키와 프록시 사이의 흐름을 허락해준다는 뜻이 어떤 의미인지를 신중히 생각해봐야 합니다. 
+
+민감한 헤더는 라우트 마다 콤마로 구별하여 설정해줄 수 있습니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  routes:
+    users:
+      path: /myusers/**
+      sensitiveHeaders: Cookie,Set-Cookie,Authorization
+      url: https://downstream
+```
+
+>  `sensitiveHeaders` 의 값은 기본 값이기 때문에 따로 설정해주지 않아도 적용 됩니다. This is new in Spring Cloud Netflix 1.1 (in 1.0, the user had no control over headers, and all cookies flowed in both directions).
+
+`sensitiveHeaders` 는 블랙리스트이며, 기본값이 존재합니다, 결과적으로 Zuul이 모든 헤더(`ignored` 에설정된 값 빼고)를 보내고 싶다면, 명시적으로 빈 리스트로 설정해야 합니다.  쿠키나 , 인증 헤더를 백엔드로 보내고 싶다면 필수적으로 해야합니다.
+
+**application.yml**
+
+```yaml
+ zuul:
+  routes:
+    users:
+      path: /myusers/**
+      sensitiveHeaders:
+      url: https://downstream
+```
+
+
+
+### 헤더 무시하기
+
+추가적으로 다운스트림 서비스와 상호작용하는 동안 `zuul.ignoredHeaders` 에 있는 값을 버리게 할 수 있습니다. (요청 응답 둘다) 기본적으로 Spring Security가 클래스패스에 없으면 `zuul.ignoredHeaders` 값들은 비어 있지만, 그렇지 않으면 Spring Security에 명시된 "security"로 알려진 헤더로 초기화 됩니다. 
 
 
 
 
-
-
-
-## 참고자료
 
 
 
