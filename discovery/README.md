@@ -803,7 +803,59 @@ The default HTTP client used by Zuul is now backed by the Apache HTTP Client ins
 
 ### 헤더 무시하기
 
-추가적으로 다운스트림 서비스와 상호작용하는 동안 `zuul.ignoredHeaders` 에 있는 값을 버리게 할 수 있습니다. (요청 응답 둘다) 기본적으로 Spring Security가 클래스패스에 없으면 `zuul.ignoredHeaders` 값들은 비어 있지만, 그렇지 않으면 Spring Security에 명시된 "security"로 알려진 헤더로 초기화 됩니다. 
+추가적으로 다운스트림 서비스와 상호작용하는 동안 `zuul.ignoredHeaders` 에 있는 값을 버리게 할 수 있습니다. (요청 응답 둘다) 기본적으로 Spring Security가 클래스패스에 없으면 `zuul.ignoredHeaders` 값들은 비어 있지만, 그렇지 않으면 Spring Security에 명시된 "security"로 알려진 헤더로 초기화 됩니다. 이런 경우 다운스트림 서비스가 이런 헤더들을 추가할 수 있습니다. 그러나 프록시로부터 오는 값들을 원할 때가 있습니다. Spring Security가 클래스패스에 있을 때, 이런 헤더들을 버리고 싶지 않으면, `zuul.ignoreSecurityHeaders` 값을 `false` 로 설정하면 됩니다. 이렇게 함으로써 Spring Security에서 HTTP 보안 응답 헤더를 비활성화 하고 다운 스트림 서비스에서 제공하는 값을 원하는 경우 유용할 수 있습니다.
+
+### 엔드포인트 관리하기
+
+기본적으로 `@EnableZuulProxy` 를 Sring Boot Actuator와 함께 사용한다면, 다음의 2개의 엔드포인트가 활성화가 됩니다.
+
+- Routes
+- Filters
+
+#### 라우트 엔드포인트
+
+GET 방식의 `/routes` 엔드포인트는 라우트에 맵핑된 리스트의 목록을 반환합니다.
+
+**GET /routes**
+
+```json
+{
+  /stores/**: "http://localhost:8081"
+}
+```
+
+추가적으로 라우트에 대한 상세정보는 `?format=details` 쿼리를 추가적으로 붙이면 볼 수 있습니다.
+
+**GET /routes/details**
+
+```json
+{
+  "/stores/**": {
+    "id": "stores",
+    "fullPath": "/stores/**",
+    "location": "http://localhost:8081",
+    "path": "/**",
+    "prefix": "/stores",
+    "retryable": false,
+    "customSensitiveHeaders": false,
+    "prefixStripped": true
+  }
+}
+```
+
+POST 방식의 `/routes` 를 호출하면 라우트를 새로고침 합니다.  (for example, when there have been changes in the service catalog). You can disable this endpoint by setting `endpoints.routes.enabled` to `false`.
+
+> the routes should respond automatically to changes in the service catalog, but the `POST` to `/routes` is a way to force the change to happen immediately.
+
+### 필터 엔드포인트
+
+GET 방식의 `/filters` 엔드포인트는 type에 따라 Zuul filter의 목록을 map으로 반환 합니다.
+
+
+
+## Strangulation Patterns and Local Forwards(교살 패턴과 로컬 포워드)
+
+애플리케이션을 마이그레이션하거나, 오래된 API 엔드포인트 때문에 힘이 들때, 천천히 다른 구현으로 바꿀때 사용하는 패턴중의 하나가 교살패턴 입니다. Zuul 프록시는 
 
 
 
