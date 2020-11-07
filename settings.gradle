@@ -1,4 +1,5 @@
 rootProject.name = 'board'
 include 'board'
-include 'discovery'
+include 'auth'
+
 
